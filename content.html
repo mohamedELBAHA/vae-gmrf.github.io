@@ -22,7 +22,10 @@
   <script src="./static/js/index.js"></script>
 
   <style>
-
+    .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+    .method-card { background: #f8f8f8; border-radius: 8px; padding: 1.25rem 1.5rem; border-left: 4px solid #3273dc; }
+    .method-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: #363636; }
+    .method-card p { font-size: 0.9rem; color: #555; margin: 0; line-height: 1.6; }
     .results-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 1rem; }
     .results-table th { background: #3273dc; color: white; padding: 8px 12px; text-align: left; }
     .results-table td { padding: 7px 12px; border-bottom: 1px solid #eee; }
@@ -31,8 +34,10 @@
     .results-table tr.ours:hover { background: #d4ecf7; }
     .dataset-section { margin-bottom: 3rem; }
     .tag-aistats { background: #3273dc; color: white; font-weight: 600; padding: 4px 12px; border-radius: 4px; font-size: 0.85rem; display: inline-block; margin-bottom: 1rem; }
-
-
+    .contribution-list { list-style: none; padding: 0; }
+    .contribution-list li { display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.75rem; font-size: 0.95rem; }
+    .contribution-list li::before { content: "→"; color: #3273dc; font-weight: bold; flex-shrink: 0; margin-top: 2px; }
+    @media (max-width: 768px) { .method-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 
@@ -184,7 +189,7 @@
     <h2 class="title is-3 has-text-centered">Method</h2>
 
     <figure style="text-align:center; margin-bottom:2rem;">
-      <img src="architecture.png" alt="GMRF MCVAE architecture" style="max-width:700px; width:100%; border-radius:6px;">
+      <img src="./static/images/architecture.png" alt="GMRF MCVAE architecture" style="max-width:700px; width:100%; border-radius:6px;">
       <figcaption style="color:#777; font-size:0.88rem; margin-top:0.5rem;">
         GMRF MCVAE architecture. Component encoders output unary potentials ψᵢ (per-component mean/variance).
         A global encoder outputs pairwise potentials ψᵢⱼ (cross-component covariances).
@@ -192,30 +197,48 @@
       </figcaption>
     </figure>
 
-    <div class="content has-text-justified" style="max-width:800px; margin:1.5rem auto 0;">
-      <p>
-        The joint latent <strong>z = (z₁,…,z_M)</strong> follows a multivariate Gaussian whose full block covariance
-        Σ = [Σᵢⱼ] is assembled from component encoders (diagonal blocks) and a shared global encoder (off-diagonal blocks),
-        explicitly capturing cross-component correlations.
-      </p>
-      <p>
-        Off-diagonal blocks are scaled to enforce block diagonal dominance, providing a <strong>provable SPD guarantee</strong>
-        that enables valid Cholesky sampling via the reparameterization trick — no approximation needed.
-      </p>
-      <p>
-        At inference, conditioning on any observed subset yields an <strong>exact Gaussian in closed form</strong> via the Schur complement,
-        eliminating the need for additional decoder passes or approximate inference.
-        In practice this reduces training time from 350 s/epoch (MVAE) to <strong>128 s/epoch</strong> on PolyMNIST.
-      </p>
+    <div class="method-grid">
+      <div class="method-card">
+        <h4>🔗 Structured latent space</h4>
+        <p>
+          The joint latent <strong>z = (z₁,…,z_M)</strong> follows a multivariate Gaussian with a full block covariance Σ = [Σᵢⱼ].
+          Diagonal blocks Σᵢᵢ come from component encoders; off-diagonal blocks Σᵢⱼ come from a shared global encoder,
+          explicitly encoding cross-component correlations.
+        </p>
+      </div>
+      <div class="method-card">
+        <h4>✅ SPD guarantee (Theorem 1)</h4>
+        <p>
+          Off-diagonal blocks are scaled by √(αᵢαⱼ) to enforce block diagonal dominance.
+          We prove this guarantees symmetric positive definiteness — enabling valid Cholesky sampling
+          via the reparameterization trick with no approximation.
+        </p>
+      </div>
+      <div class="method-card">
+        <h4>⚡ Closed-form conditioning</h4>
+        <p>
+          Conditioning on observed component zⱼ yields an exact Gaussian via the Schur complement:
+          <em>p(zᵢ | zⱼ) = 𝒩(μᵢ + Σᵢⱼ Σⱼⱼ⁻¹(zⱼ − μⱼ), Σᵢᵢ − Σᵢⱼ Σⱼⱼ⁻¹ Σⱼᵢ)</em>.
+          No additional training or approximate inference needed.
+        </p>
+      </div>
+      <div class="method-card">
+        <h4>🚀 Computational efficiency</h4>
+        <p>
+          Baselines need O(M²) decoder passes for cross-reconstruction. GMRF MCVAE replaces these with
+          a closed-form matrix operation — O(M²d²) covariance build + O(M) self-decodes.
+          In practice: <strong>128 s/epoch</strong> vs 350 s for MVAE on PolyMNIST (same GPU).
+        </p>
+      </div>
     </div>
 
-    <div class="content has-text-justified" style="max-width:800px; margin:2rem auto 0;">
+    <div class="content" style="margin-top:2rem;">
       <h3 class="title is-4">Key contributions</h3>
-      <ul>
-        <li>A novel architecture embedding GMRFs in both prior and posterior of a Multi-Component VAE.</li>
-        <li>A practical SPD construction via blockwise assembly with a proven diagonal dominance guarantee.</li>
-        <li>A new structural coherence metric based on Wasserstein distance between component centers of mass.</li>
-        <li>State-of-the-art on Copula, competitive on PolyMNIST, and best structural coherence on BIKED.</li>
+      <ul class="contribution-list">
+        <li><strong>Novel architecture</strong> embedding GMRFs in both prior and posterior of a Multi-Component VAE.</li>
+        <li><strong>Practical SPD construction</strong> via blockwise assembly with a proven diagonal dominance guarantee.</li>
+        <li><strong>New metric for structural coherence</strong> — Wasserstein distance between centers of mass of generated components, applicable to any multi-part industrial dataset.</li>
+        <li><strong>State-of-the-art</strong> on synthetic Copula, competitive on PolyMNIST, best structural coherence on BIKED.</li>
       </ul>
     </div>
   </div>
@@ -237,7 +260,7 @@
         </p>
       </div>
       <figure style="text-align:center; margin:1.5rem 0;">
-        <img src="copula.png" alt="Copula qualitative results" style="width:100%; border-radius:6px;">
+        <img src="./static/images/copula_results.png" alt="Copula qualitative results" style="width:100%; border-radius:6px;">
         <figcaption style="color:#777; font-size:0.88rem; margin-top:0.5rem;">
           Joint distribution of generated samples (blue) vs. ground truth (orange). GMRF MCVAE is the only model to faithfully capture all cross-component correlations.
         </figcaption>
@@ -265,7 +288,7 @@
         </p>
       </div>
       <figure style="text-align:center; margin:1.5rem 0;">
-        <img src="polymnist.png" alt="PolyMNIST conditional generations" style="width:100%; border-radius:6px;">
+        <img src="./static/images/polymnist_results.png" alt="PolyMNIST conditional generations" style="width:100%; border-radius:6px;">
         <figcaption style="color:#777; font-size:0.88rem; margin-top:0.5rem;">
           Conditional generation on PolyMNIST. GMRF MCVAE consistently generates the correct digit across all five modalities.
         </figcaption>
@@ -297,7 +320,7 @@
         </p>
       </div>
       <figure style="text-align:center; margin:1.5rem 0;">
-        <img src="biked.png" alt="BIKED conditional generations" style="width:100%; border-radius:6px;">
+        <img src="./static/images/biked_results.png" alt="BIKED conditional generations" style="width:100%; border-radius:6px;">
         <figcaption style="color:#777; font-size:0.88rem; margin-top:0.5rem;">
           Conditional generation on BIKED. First column: conditioning component. Our model (Ours) consistently generates complete, structurally coherent bicycles.
         </figcaption>
@@ -324,13 +347,13 @@
   <div class="container is-max-desktop content">
     <h2 class="title">BibTeX</h2>
     <pre><code>@inproceedings{oubari2026gmrf,
-  author    = {Oubari Fouad, El Baha Mohamed, Meunier Raphaël, Décatoire Rodrigue, Mougeot Mathilde},
+  author    = {Oubari, Fouad and El Baha, Mohamed and Meunier, Raphaël and Décatoire, Rodrigue and Mougeot, Mathilde},
   title     = {Multi-Component VAE with Gaussian Markov Random Field},
   booktitle = {Proceedings of the 29th International Conference on Artificial Intelligence and Statistics (AISTATS)},
   year      = {2026},
-  volume    = {},
-  series    = {},
-  publisher = {}
+  volume    = {300},
+  series    = {Proceedings of Machine Learning Research},
+  publisher = {PMLR}
 }</code></pre>
   </div>
 </section>
